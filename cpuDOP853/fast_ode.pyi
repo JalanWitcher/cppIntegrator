@@ -1,10 +1,12 @@
 # fast_ode.pyi
-from typing import List, Tuple
+import numpy as np
+from typing import List, Tuple, Union
+import numpy.typing as npt
 
 def run_simulation(
     z0: float, 
     v0: float, 
-    breakpoints: List[float], 
+    breakpoints: Union[List[float], npt.NDArray[np.float64]], 
     k: float, 
     gEf: float, 
     B: float,
@@ -20,12 +22,14 @@ def run_simulation(
     trackerStartTime: float = 0.0,
     simMode: int = 0,
     rtol: float = 1e-7,
-    atol: float = 1e-10
-) -> Tuple[List[float], List[float], List[float], List[float], List[float], List[float], List[float]]:
+    atol: float = 1e-10,
+    initialStep: float = 1e-4
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64], 
+           npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64], bool]:
     """
-    Run DOP853 ODE integration through defined sub-intervals with alternating A values.
+    Run DOP853 ODE integration through defined sub-intervals.
     
-    Parameters:
+    **Parameters:**
     -----------
     z0 : float
         Initial position.
@@ -73,10 +77,13 @@ def run_simulation(
         Max relative tolerance (default = 1e-7).
     atol : float
         Max absolute tolerance (default = 1e-10).
+    initialStep : float
+        Initial step size for the integrator (default = 1e-4).
         
     Returns:
     --------
-    Tuple[List[float], List[float], List[float], List[float], List[float], List[float], List[float]]
-        A tuple containing seven lists: (time_history, z_history, v_history, t_max, z_max, t_min, z_min).
+    Tuple[List[float], List[float], List[float], List[float], List[float], List[float], List[float], bool]
+        A tuple containing seven arrays and a boolean flag: (time_history, z_history, v_history, t_max, z_max, t_min, z_min, captured).
     """
+    ...
     ...
