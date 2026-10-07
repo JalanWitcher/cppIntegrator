@@ -12,7 +12,7 @@ else:
 
 ext_modules = [
     Pybind11Extension(
-        "fast_ode",                  # The name of the module you will import in Python
+        "ode_cpp",                  # The name of the module you will import in Python
         [r"dop853_bind.cpp"],         # The C++ source file
         cxx_std=17,
         extra_compile_args=compiler_args,
@@ -20,7 +20,7 @@ ext_modules = [
 ]
 
 setup(
-    name="fast_ode",
+    name="ode_cpp",
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )
