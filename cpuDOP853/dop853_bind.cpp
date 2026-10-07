@@ -42,6 +42,13 @@ struct TrajectoryTracker {
     bool captured = true;
 };
 
+// Keeps informations about the integration process
+struct Status {
+    int nAccepted = 0;
+    int nRejected = 0;
+    int MODE;
+};
+
 // Fixed Butcher Tableau Constants for DOP853
 namespace DOP853Const {
     constexpr int STAGES = 12;
@@ -290,7 +297,8 @@ void integrate_dop853(
     SystemParams& params, // Parameters that defines the system
     PeakTracker& trackerMax, // Tracker of the maxima
     PeakTracker& trackerMin, // Tracker of the minima
-    TrajectoryTracker& trajectory){ // Tracker of validated steps
+    TrajectoryTracker& trajectory, // Tracker of validated steps
+    Status& integrationStatus){ 
         // Record the initial state using the GLOBAL initial time
         trajectory.t.push_back(breakpoints[0]);
         trajectory.z.push_back(y.z);
@@ -322,6 +330,7 @@ void integrate_dop853(
     
                 bool accepted = dop853_step<MODE>(t, y, h, rtol, atol, params);
                 if (accepted) {
+                    integrationStatus.nAccepted++;
                     // Determine the offset for this specific sub-interval
                     double current_offset = breakpoints[b-1];
                     // Verify if the step crosses the startTime of the trackers
@@ -341,6 +350,7 @@ void integrate_dop853(
                         return; // Terminate Integration
                     }
                 }
+                else integrationStatus.nRejected++;
             }
             // Reset local time to 0 for the start of the next sub-interval
             t = 0.0;
@@ -379,7 +389,8 @@ py::array_t<T> as_pyarray(std::vector<T>&& vec) {
 
 // Wrapper function Python will actually call
 std::tuple<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, 
-           py::array_t<double>, py::array_t<double>, py::array_t<double>, bool>
+           py::array_t<double>, py::array_t<double>, py::array_t<double>, 
+           std::tuple<bool, int, int, int>>
 run_simulation(double z0, double v0, 
                std::vector<double> breakpoints,
                double k, double gEf, double B, double zEq, double Lambda, // System params
@@ -423,15 +434,17 @@ run_simulation(double z0, double v0,
     // The number of breakpoints never reach billions
     int num_bp = static_cast<int>(breakpoints.size());
 
+    Status integrationStatus = {0,0,simMode};
+
     // Perform the integration
     if (simMode == 0) {
         params.A = val0;
-        integrate_dop853<0>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory);
+        integrate_dop853<0>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory, integrationStatus);
     } else if (simMode == 1) {
         params.phi = val0;
-        integrate_dop853<1>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory);
+        integrate_dop853<1>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory, integrationStatus);
     } else if (simMode == 2) {
-        integrate_dop853<2>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory);
+        integrate_dop853<2>(y, t, bp_ptr, num_bp, val0, val1, rtol, atol, initialStep, params, trackerMax, trackerMin, trajectory, integrationStatus);
     }
 
     // Re-acquire the Python GIL after performing the integration and before before using the Python C-API
@@ -452,7 +465,7 @@ run_simulation(double z0, double v0,
         readPeaksTracker(trackerMin, py_min_times, py_min_positions);
     }
 
-    // Return the trajectory and peaks as NumPy arrays
+    // Return the Trajectory and Peaks as NumPy arrays and a tuple with Status
     return std::make_tuple(
         as_pyarray(std::move(trajectory.t)),
         as_pyarray(std::move(trajectory.z)),
@@ -461,7 +474,7 @@ run_simulation(double z0, double v0,
         as_pyarray(std::move(py_max_positions)),
         as_pyarray(std::move(py_min_times)),
         as_pyarray(std::move(py_min_positions)),
-        trajectory.captured
+        std::make_tuple(trajectory.captured, integrationStatus.MODE, integrationStatus.nAccepted, integrationStatus.nRejected)
     );
 }
 
